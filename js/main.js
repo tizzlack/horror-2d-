@@ -132,8 +132,12 @@ async function navigate(name, screenParams) {
   root.dataset.screen = name;
   root.classList.add('fade-in');
   setTimeout(() => root.classList.remove('fade-in'), 500);
+  // Don't await mount: screens may run long intros inside it, and the next go()
+  // must not wait for them.
   try {
-    await current.mount(root, screenParams, ctx);
+    Promise.resolve(current.mount(root, screenParams, ctx)).catch((err) => {
+      showError(`Screen "${name}" crashed while mounting.\n\n${err?.stack ?? err}`);
+    });
   } catch (err) {
     showError(`Screen "${name}" crashed while mounting.\n\n${err?.stack ?? err}`);
   }

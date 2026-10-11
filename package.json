@@ -1,0 +1,15 @@
+{
+  "name": "same-shape",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Same silhouette. Different souls. A hand-drawn horror game about who you let in.",
+  "type": "module",
+  "scripts": {
+    "serve": "npx http-server . -p 8080 -c-1",
+    "test": "node tests/run.mjs",
+    "build": "node tools/build_artifact.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}
