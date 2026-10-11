@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Same Shape</title>
+<meta name="description" content="Same silhouette. Different souls. A hand-drawn horror game about who you let in.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Patrick+Hand+SC&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/figure.css">
+<link rel="stylesheet" href="css/night.css">
+<link rel="stylesheet" href="css/day.css">
+<link rel="stylesheet" href="css/meta.css">
+</head>
+<body>
+<!-- Shared SVG filters. Use with CSS `filter: url(#sketch)` or the `.boil` class. -->
+<svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="sketch" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="1" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="sketch2" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="sketch3" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="13" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- Turns any image into a flat black silhouette that keeps its alpha. -->
+    <filter id="silhouette">
+      <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/>
+    </filter>
+    <!-- Rough wobbly edge for drawn shapes (borders, panels). -->
+    <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="3" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4"/>
+    </filter>
+  </defs>
+</svg>
+
+<div id="viewport">
+  <div id="stage" class="stage">
+    <div id="screen" class="screen-root"></div>
+    <div id="overlay" class="overlay-root"></div>
+    <div id="captions" class="captions" aria-live="polite"></div>
+    <div class="paper-grain" aria-hidden="true"></div>
+  </div>
+</div>
+<noscript>Same Shape needs JavaScript to run.</noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
