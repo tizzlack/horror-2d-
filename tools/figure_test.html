@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<base href="../">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Same Shape - figure render test</title>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Patrick+Hand+SC&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/figure.css">
+<style>
+  html, body { overflow: auto; height: auto; background: #1a1d28; color: #efe6d3; user-select: text; }
+  body { padding: 16px 24px 80px; font-size: 18px; }
+  h1, h2 { margin: 18px 0 8px; }
+  h2 { border-bottom: 2px dashed #4c5468; padding-bottom: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 14px; color: #b9c0cc; }
+  .night { background: radial-gradient(circle at 50% 40%, #232a3d, #0d1019); padding: 8px; border-radius: 10px; }
+  .paper { background: var(--paper); color: var(--ink); padding: 8px; border-radius: 10px; }
+  .wall { background: radial-gradient(ellipse at 50% 30%, #e9d9a8, #8a7a52); padding: 8px 8px 0; border-radius: 10px; overflow: hidden; }
+  .peep { position: relative; width: 360px; height: 360px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle, #3a4256, #10131d); border: 6px solid #2b2622; }
+  .peep .fig-view { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); }
+  .toolbar { position: sticky; top: 0; z-index: 200; background: #11141e; padding: 8px 0; display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #333; }
+  #icons .cell { color: #efe6d3; width: 76px; }
+  #stagebox { position: relative; width: 1280px; height: 720px; background: #0d1019; overflow: hidden; transform-origin: top left; margin: 10px 0; }
+  .ctrl { display: flex; gap: 10px; align-items: center; }
+  .stat { font-family: monospace; font-size: 13px; color: #9fc; }
+</style>
+</head>
+<body>
+<svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="sketch" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="1" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G"/></filter>
+    <filter id="sketch2" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G"/></filter>
+    <filter id="sketch3" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="13" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G"/></filter>
+    <filter id="silhouette"><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter>
+    <filter id="rough" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="3" seed="3" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="4"/></filter>
+  </defs>
+</svg>
+
+<h1>Same Shape - render test</h1>
+<div class="toolbar" id="toolbar"></div>
+<div id="stagehost"></div>
+<div id="out"></div>
+
+<script type="module">
+import { FIGURES, getFigure, FACELESS } from './js/data/figures.js';
+import { createFigureView, createShadowView, createMirrorView, createPortrait, TELL_EFFECTS } from './js/render/figure.js';
+import { jumpscare, reveal, shake, flash, lightFlicker, createFogEdge } from './js/render/effects.js';
+import { ICONS, icon } from './js/render/icons.js';
+
+const q = new URLSearchParams(location.search);
+const only = q.get('s') ?? 'all';
+const want = (n) => only === 'all' || only.split(',').includes(n);
+const out = document.getElementById('out');
+const views = [];
+window.__views = views;
+const el = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids.filter(Boolean)); return e; };
+const cell = (node, label) => el('div', 'cell', node, label);
+const section = (title, id) => { const h = el('h2'); h.textContent = title; const row = el('div', 'row'); row.id = id; out.append(h, row); return row; };
+// The data file may still carry stub anchors; the test page uses measured ones for a few figures.
+const TEST_ANCHORS = {
+  nimi: { head: [0.47, 0.34], face: [0.46, 0.52], eyeL: [0.333, 0.535], eyeR: [0.57, 0.50], mouth: [0.46, 0.62], body: [0.47, 0.76], handL: [0.24, 0.8], handR: [0.72, 0.8], feet: [0.47, 0.95] },
+  shady: { head: [0.47, 0.35], face: [0.47, 0.53], eyeL: [0.34, 0.535], eyeR: [0.56, 0.53], mouth: [0.46, 0.62], body: [0.47, 0.76], handL: [0.24, 0.8], handR: [0.72, 0.8], feet: [0.5, 0.95] },
+  zipp: { head: [0.5, 0.3], face: [0.5, 0.52], eyeL: [0.34, 0.53], eyeR: [0.57, 0.50], mouth: [0.46, 0.62], body: [0.5, 0.76], handL: [0.24, 0.8], handR: [0.74, 0.8], feet: [0.5, 0.95] },
+  glitch: { head: [0.48, 0.34], face: [0.48, 0.42], eyeL: [0.4, 0.42], eyeR: [0.56, 0.42], mouth: [0.48, 0.5], body: [0.5, 0.76], handL: [0.24, 0.8], handR: [0.74, 0.8], feet: [0.5, 0.95] },
+  zen: { head: [0.5, 0.34], face: [0.5, 0.55], eyeL: [0.34, 0.55], eyeR: [0.58, 0.525], mouth: [0.47, 0.64], body: [0.5, 0.76], handL: [0.24, 0.8], handR: [0.72, 0.8], feet: [0.5, 0.95] },
+};
+const fig = (id) => { const f = getFigure(id) ?? FIGURES[0]; if (q.has('real') || f.anchors?.face?.[1] !== 0.36) return f; // stub data detected: use measured test anchors
+  const odd = { glitch: 'flicker', shady: 'dark', zipp: 'wind' }[f.id];
+  return { ...f, anchors: TEST_ANCHORS[f.id] ?? f.anchors, honestOddity: f.honestOddity ?? (odd ? { effect: odd, note: '' } : null) }; };
+const track = (v) => { views.push(v); return v; };
+
+// ---------------------------------------------------------------- sample tells
+const SAMPLE = {
+  drip: ['face', { color: '#111' }], smear: ['body', { size: 50 }], pixels: ['head', {}], extraEye: ['head', { size: 30 }],
+  eyeGlow: ['eyeL', { color: '#ff3b2f' }], crack: ['face', { color: '#ffd24a' }], spikes: ['head', { count: 6 }],
+  bubbles: ['head', {}], frost: [null, {}], teeth: ['mouth', {}], spores: ['body', {}], smoke: ['head', {}],
+  static: ['face', {}], stars: ['head', {}], wetPrints: ['feet', {}], rust: ['body', {}], vine: ['handR', {}],
+  mirrored: ['body', {}], tilt: ['body', { deg: 7 }], tooClose: ['body', {}], noBlink: ['face', {}], jitter: ['body', {}], translucent: ['body', {}],
+};
+const sampleTell = (effect, level) => ({ id: `t_${effect}_${level}`, level, kind: 'visual', effect, at: SAMPLE[effect][0], params: SAMPLE[effect][1], revealedBy: 'eye', desc: effect });
+
+// ---------------------------------------------------------------- toolbar
+const tb = document.getElementById('toolbar');
+const btn = (label, fn) => { const b = el('button', 'btn small'); b.textContent = label; b.onclick = fn; tb.append(b); return b; };
+const host = document.getElementById('stagehost');
+const stageBox = el('div'); stageBox.id = 'stagebox'; stageBox.style.display = 'none';
+host.append(stageBox);
+const sampleFig = () => fig(q.get('f') ?? 'nimi');
+const showStage = () => { stageBox.style.display = 'block'; stageBox.scrollIntoView({ block: 'nearest' }); };
+btn('Jumpscare', async () => { showStage(); await jumpscare(stageBox, sampleFig(), { reduced: false }); });
+btn('Jumpscare (reduced)', async () => { showStage(); await jumpscare(stageBox, sampleFig(), { reduced: true }); });
+btn('Reveal', async () => { const t = document.querySelector('.peep'); t?.scrollIntoView({ block: 'center' }); await reveal(t, sampleFig(), {}); });
+btn('Reveal (reduced)', async () => { const t = document.querySelector('.peep'); await reveal(t, sampleFig(), { reduced: true }); });
+btn('Shake', () => shake(document.querySelector('.peep'), { intensity: 10, duration: 500 }));
+btn('Flash', () => { showStage(); flash(stageBox, { color: '#fff', duration: 200 }); });
+btn('Red flash', () => { showStage(); flash(stageBox, { color: '#a3231b', duration: 300 }); });
+btn('Flicker', () => lightFlicker(document.querySelector('.peep'), { duration: 1000 }));
+const fogRange = el('input'); fogRange.type = 'range'; fogRange.min = 0; fogRange.max = 1; fogRange.step = 0.01; fogRange.value = 0;
+tb.append(el('span', 'ctrl', 'fog', fogRange));
+const stat = el('span', 'stat'); tb.append(stat);
+
+// ---------------------------------------------------------------- figures
+if (want('figures')) {
+  const row = section('All figures: standard + monster', 'figs');
+  for (const f of [...FIGURES, FACELESS]) {
+    row.append(el('div', 'night', cell(track(createFigureView(f, { form: 'standard', height: 250 })).el, `${f.name}`)));
+    if (f !== FACELESS) row.append(el('div', 'night', cell(track(createFigureView(f, { form: 'monster', height: 250 })).el, `${f.name} (monster)`)));
+  }
+}
+
+// ---------------------------------------------------------------- tells
+if (want('tells')) {
+  const row = section('Tell effects (level 1 left, level 2 right) on a sample figure', 'tells');
+  const fid = q.get('f') ?? 'nimi';
+  for (const e of Object.keys(SAMPLE)) {
+    for (const lvl of [1, 2]) {
+      const v = track(createFigureView(fig(fid), { form: 'standard', height: Number(q.get('h') ?? 300), tells: [sampleTell(e, lvl)] }));
+      row.append(el('div', 'night', cell(v.el, `${e} L${lvl}`)));
+    }
+  }
+  const nonVisual = TELL_EFFECTS.filter((x) => !SAMPLE[x]).join(', ');
+  out.append(el('p', 'cell', `Effects that draw nothing (audio/text/behaviour handled elsewhere): ${nonVisual}`));
+}
+
+// ---------------------------------------------------------------- every figure's real tells
+if (want('real')) {
+  const row = section('Real tells from figures.js (visual/behavior ones animate; label = figure / tell id)', 'real');
+  for (const f of FIGURES) {
+    for (const tell of f.tells) {
+      if (tell.kind === 'audio' || tell.kind === 'text') continue;
+      row.append(el('div', 'night', cell(track(createFigureView(f, { height: Number(q.get('h') ?? 260), tells: [tell] })).el, `${f.id} L${tell.level} ${tell.effect}`)));
+    }
+  }
+  const odd = section('Honest oddities with real data', 'realodd');
+  for (const f of FIGURES.filter((x) => x.honestOddity)) odd.append(el('div', 'night', cell(track(createFigureView(f, { height: 300 })).el, `${f.id} ${f.honestOddity.effect}`)));
+}
+
+// ---------------------------------------------------------------- honest oddities, dark, light
+if (want('odd')) {
+  const row = section('Honest oddities (flicker / dark / wind), setDark, setLight', 'odd');
+  for (const id of ['glitch', 'shady', 'zipp']) row.append(el('div', 'night', cell(track(createFigureView(fig(id), { height: 300 })).el, `${id} (honest)`)));
+  row.append(el('div', 'night', cell(track(createFigureView(fig('glitch'), { height: 300, honestOddity: false })).el, 'glitch (oddity off)')));
+  const wh = track(createFigureView(fig('lume'), { height: 300, dark: true }));
+  row.append(el('div', 'night', cell(wh.el, 'whisperer: setDark(true)')));
+  const wh2 = track(createFigureView(fig('lume'), { height: 300, dark: true })); wh2.setDark(false);
+  row.append(el('div', 'night', cell(wh2.el, 'setDark(false)')));
+  for (const l of [0.6, 0.3, 0.1]) { const v = track(createFigureView(fig('roku'), { height: 300 })); v.setLight(l); row.append(el('div', 'night', cell(v.el, `setLight(${l})`))); }
+}
+
+// ---------------------------------------------------------------- peephole (reveal / fog)
+if (want('peep')) {
+  const row = section('Peephole: reveal, shake, flicker, fog', 'peep');
+  const peep = el('div', 'peep');
+  const v = track(createFigureView(fig(q.get('f') ?? 'nimi'), { height: 330 }));
+  peep.append(v.el);
+  const fog = track(createFogEdge(360)); Object.assign(fog.el.style, { position: 'absolute', left: '0', top: '0' }); peep.append(fog.el);
+  window.__fog = fog;
+  fogRange.oninput = () => fog.set(Number(fogRange.value));
+  row.append(peep);
+  for (const p of [0, 0.3, 0.7, 1]) {
+    const w = el('div', 'peep'); w.style.width = w.style.height = '200px';
+    const vv = track(createFigureView(fig('nimi'), { height: 190 })); w.append(vv.el);
+    const ff = track(createFogEdge(200)); ff.set(p); Object.assign(ff.el.style, { position: 'absolute', left: '0', top: '0' }); w.append(ff.el);
+    row.append(cell(w, `fog ${p}`));
+  }
+}
+
+// ---------------------------------------------------------------- shadows
+if (want('shadows')) {
+  const row = section('Shadows (monster, standard, flicker)', 'shadows');
+  const mk = (id, opts, label) => {
+    const wrap = el('div', 'wall'); wrap.style.cssText += 'width:260px;height:400px;position:relative;';
+    const s = track(createShadowView(fig(id), { height: 300, ...opts })); s.el.style.cssText += ';position:absolute;left:50px;bottom:0';
+    wrap.append(s.el); row.append(cell(wrap, label));
+  };
+  for (const id of ['tobi', 'nimi', 'kai', 'glitch']) mk(id, { form: 'monster' }, `${id} monster`);
+  mk('lume', { form: 'standard' }, 'lume standard');
+  mk('nimi', { form: 'standard', flicker: true }, 'nimi flicker');
+  mk('zen', { form: 'standard', flicker: true }, 'zen flicker');
+}
+
+// ---------------------------------------------------------------- mirrors
+if (want('mirrors')) {
+  const row = section('Mirror reflections (monster / standard)', 'mirrors');
+  for (const id of ['nimi', 'zen', 'tobi', 'shady', 'kuro', 'glitch']) {
+    row.append(el('div', 'night', cell(track(createMirrorView(fig(id), { form: 'monster', size: 190 })).el, `${id} monster`)));
+  }
+  row.append(el('div', 'night', cell(track(createMirrorView(fig('nimi'), { form: 'standard', size: 190 })).el, 'nimi standard')));
+}
+
+// ---------------------------------------------------------------- portraits
+if (want('portraits')) {
+  const row = section('Portraits + stamps', 'portraits');
+  const mk = (f, opts, label) => row.append(el('div', 'paper', cell(createPortrait(fig(f), { height: 190, ...opts }), label)));
+  mk('lume', {}, 'plain'); mk('lume', { stamp: 'MET' }, 'MET'); mk('zen', { stamp: 'LOST' }, 'LOST');
+  mk('tobi', { grayscale: true }, 'grayscale'); mk('kai', { form: 'monster', stamp: 'LOST' }, 'monster');
+  mk('nimi', { height: 110 }, 'small');
+  const bad = { ...fig('nimi'), id: 'missing', name: 'Missing', images: { standard: 'assets/figures/nope.png', monster: 'assets/figures/nope2.png' } };
+  row.append(el('div', 'paper', cell(createPortrait(bad, { height: 190, stamp: 'MET' }), 'missing image (portrait)')));
+  row.append(el('div', 'night', cell(track(createFigureView(bad, { height: 250 })).el, 'missing image (view)')));
+  row.append(el('div', 'night', cell(track(createShadowView(bad, { form: 'monster', height: 200 })).el, 'missing (shadow)')));
+  row.append(el('div', 'night', cell(track(createMirrorView(bad, { form: 'monster', size: 150 })).el, 'missing (mirror)')));
+}
+
+// ---------------------------------------------------------------- icons
+if (want('icons')) {
+  const row = section('Icons', 'icons');
+  for (const name of Object.keys(ICONS)) {
+    const a = el('div', 'paper', icon(name, { size: 48 }));
+    const b = el('div', 'night', icon(name, { size: 28 })); b.style.color = '#f2b84b';
+    row.append(el('div', 'cell', el('div', 'row', a, b), name));
+  }
+}
+
+// ---------------------------------------------------------------- perf + destroy test helpers
+window.__perf = (ms = 3000) => new Promise((resolve) => {
+  const d = []; let last = performance.now(); const t0 = last;
+  const f = (n) => { d.push(n - last); last = n; if (n - t0 < ms) requestAnimationFrame(f); else { d.shift(); const avg = d.reduce((a, b) => a + b, 0) / d.length; resolve({ frames: d.length, avg: +avg.toFixed(2), max: +Math.max(...d).toFixed(1), p95: +d.slice().sort((a, b) => a - b)[Math.floor(d.length * 0.95)].toFixed(1) }); } };
+  requestAnimationFrame(f);
+});
+window.__api = { createFigureView, createShadowView, createMirrorView, createPortrait, jumpscare, reveal, createFogEdge, FIGURES, getFigure };
+window.__rafCount = () => window.__rafs;
+(() => { const orig = window.requestAnimationFrame.bind(window); window.__rafs = 0; window.requestAnimationFrame = (fn) => { window.__rafs++; return orig(fn); }; })();
+document.title = 'Same Shape - figure render test (ready)';
+</script>
+</body>
+</html>
